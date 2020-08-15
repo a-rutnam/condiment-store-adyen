@@ -1,0 +1,27 @@
+{
+  "name": "adyen",
+  "version": "1.0.0",
+  "description": "adyen take home",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon index.js",
+    "debug": "ndb nodemon --exec \"node index.js\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/a-rutnam/adyen.git"
+  },
+  "author": "anusha rutnam a.rutnam@gmail.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/a-rutnam/adyen/issues"
+  },
+  "homepage": "https://github.com/a-rutnam/adyen#readme",
+  "dependencies": {
+    "axios": "^0.19.2",
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "express-handlebars": "^5.1.0",
+    "nodemon": "^2.0.4"
+  }
+}
