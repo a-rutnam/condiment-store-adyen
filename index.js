@@ -51,7 +51,7 @@ app.get('/api/payment_methods', async (req, res) => {
         "value": 1000
       },
       "channel": "Web",
-      "shopperLocale": "nl-NL"
+      "shopperLocale": "en-US"
     },
     headers: {
       "X-API-Key": process.env.API_KEY,
@@ -70,31 +70,43 @@ app.get('/api/payment_methods', async (req, res) => {
 
 app.post('/api/create_payment', async (req, res) => {
 
-  // try {
-    const response = await axios({
-      method: 'POST',
-      url: 'https://checkout-test.adyen.com/v53/payments',
-      data: {
-        "amount":{
-          "currency":"AUD",
-          "value":1000
-        },
-        "reference":"YOUR_ORDER_NUMBER",
-        "paymentMethod": req.body.paymentMethod,
-        "returnUrl":"http://localhost:5000/checkout",
-        "merchantAccount":"AdyenRecruitmentCOM"
+  const gatewayRequest = {
+    method: 'POST',
+    url: 'https://checkout-test.adyen.com/v53/payments',
+    data: {
+      "amount":{
+        "currency":"AUD",
+        "value":1000
       },
-      headers: {
-        "X-API-Key": process.env.API_KEY,
-        "Content-type": "application/json"
-      },
-    });
-  // } catch(err) {
-  //   // console.error(`Error: ${err.message}, error code: ${err.errorCode}`);
-  //   console.log("error:", err);
+      "reference":"YOUR_ORDER_NUMBER",
+      "paymentMethod": req.body.paymentMethod,
+      "returnUrl":"http://localhost:5000/checkout",
+      "merchantAccount":"AdyenRecruitmentCOM",
+      "channel":"web",
+      "additionalData":{
+        "allow3DS2":true
+       },
+       "browserInfo": req.body.browserInfo
+    },
+    headers: {
+      "X-API-Key": process.env.API_KEY,
+      "Content-type": "application/json"
+    },
+  };
+
+  console.log('=================================================');
+  console.log('REQUEST OBJECT:', gatewayRequest);
+  console.log('=================================================');
+
+  let response = null;
+  try {
+     response = await axios( gatewayRequest);
+  } catch(err) {
+    // console.error(`Error: ${err.message}, error code: ${err.errorCode}`);
+    console.log("error:", err);
   //   // ask luke what that error object is, how to orrectly access messafe
   //   //     res.status(err.statusCode).json(err.message);
-  // }
+  }
 console.log("yo", response);
     res.json(response.data);
 // return "lll"

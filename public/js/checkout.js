@@ -8,11 +8,15 @@ const createConfig = (paymentMethods, clientKey) => {
     environment: "test",
     onSubmit: async (state, dropin) => {
       const paymentResponse = await axios.post('/api/create_payment', {
-        paymentMethod: state.data.paymentMethod
+        paymentMethod: state.data.paymentMethod,
+        browserInfo: state.data.browserInfo
       });
       // ask Luke: isn't this else brittle? Or, what is the best way to check that payment response has data in it, and isn't null
+      console.log("plain data obj:", paymentResponse.data);
+
       if (paymentResponse.data.action) {
-        // console.log("fff", paymentResponse.data);
+        console.log("fff", paymentResponse.data);
+        debugger;
         dropin.handleAction(paymentResponse.data.action);
       } else {
       // Your function to show the final result to the shopper
@@ -24,7 +28,7 @@ const createConfig = (paymentMethods, clientKey) => {
 }; // getConfig()
 
 const handlePaymentGatewayResponse = (dropin, response) => {
-  console.log("handlePaymentGatewayResponse:", response.resultCode);
+  console.log("handlePaymentGatewayResponse:", response);
   // dropin.setStatus('success', { message: 'Payment successful!' });
 
   // dropin.setStatus('loading'); // start the loading state
