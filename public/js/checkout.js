@@ -2,58 +2,70 @@
 
 const createConfig = (paymentMethods, clientKey) => {
   return {
-   paymentMethodsResponse: paymentMethods, // The `/paymentMethods` response from the server.
-   clientKey: clientKey, // Web Drop-in versions before 3.10.1 use originKey instead of clientKey.
-   locale: "en-US",
-   environment: "test",
-   onSubmit: (state, dropin) => {
-     console.log("state:", state.data.paymentMethod);
-     axios.post('/api/create_payment', {
-       paymentMethod: state.data.paymentMethod
-     });
-       // // Your function calling your server to make the `/payments` request
-       // makePayment(state.data)
-       //   .then(response => {
-       //     if (response.action) {
-       //       // Drop-in handles the action object from the /payments response
-       //       dropin.handleAction(response.action);
-       //     } else {
-       //       // Your function to show the final result to the shopper
-       //       showFinalResult(response);
-       //     }
-       //   })
-       //   .catch(error => {
-       //     throw Error(error);
-       //   });
-     },
-   // onAdditionalDetails: (state, dropin) => {
-   //   // Your function calling your server to make a `/payments/details` request
-   //   makeDetailsCall(state.data)
-   //     .then(response => {
-   //       if (response.action) {
-   //         // Drop-in handles the action object from the /payments response
-   //         dropin.handleAction(response.action);
-   //       } else {
-   //         // Your function to show the final result to the shopper
-   //         showFinalResult(response);
-   //       }
-   //     })
-   //     .catch(error => {
-   //       throw Error(error);
-   //     });
-   // },
-   // paymentMethodsConfiguration: {
-   //   card: { // Example optional configuration for Cards
-   //     hasHolderName: true,
-   //     holderNameRequired: true,
-   //     enableStoreDetails: true,
-   //     hideCVC: false, // Change this to true to hide the CVC field for stored cards
-   //     name: 'Credit or debit card'
-   //   }
-   // }
- };
+    paymentMethodsResponse: paymentMethods, // The `/paymentMethods` response from the server.
+    clientKey: clientKey, // Web Drop-in versions before 3.10.1 use originKey instead of clientKey.
+    locale: "en-US",
+    environment: "test",
+    onSubmit: async (state, dropin) => {
+      const paymentResponse = await axios.post('/api/create_payment', {
+        paymentMethod: state.data.paymentMethod
+      });
+      // ask Luke: isn't this else brittle? Or, what is the best way to check that payment response has data in it, and isn't null
+      if (paymentResponse.data.action) {
+        // console.log("fff", paymentResponse.data);
+        dropin.handleAction(paymentResponse.data.action);
+      } else {
+      // Your function to show the final result to the shopper
+        console.log("hooray:", paymentResponse.data);
+        handlePaymentGatewayResponse( dropin, paymentResponse.data );
+      }; //if action
+    } //onSubmit
+  }; //return
 }; // getConfig()
 
+const handlePaymentGatewayResponse = (dropin, response) => {
+  console.log("handlePaymentGatewayResponse:", response.resultCode);
+  // dropin.setStatus('success', { message: 'Payment successful!' });
+
+  // dropin.setStatus('loading'); // start the loading state
+
+  let resultCode = response.resultCode;
+
+
+// use spread to send args to dropin.setStatus
+
+//     switch (resultCode) {
+//       case "Authorised":
+//         return ['success', { message: 'Payment successful!' }]
+//       case "Error":
+//       // ideally library would present the docs info here i.e. not supported means "The shopper's bank does not support or does not allow this type of transaction."
+//         return ["error", `${response.data.refusalReason} - More info here https://docs.adyen.com/development-resources/refusal-reasons`]
+//       case "Pending":
+//       // ideally i'd want seller to say we will contact you when payment is completed
+//         return "We've received your order, and are waiting for the payment to be completed."
+//       case "PresentToShopper":
+// //       For a voucher payment method, inform the shopper that you are waiting for their payment. You will receive the final result of the payment in an AUTHORISATION notification.
+// //
+// // For a qrCode payment method, wait for the AUTHORISATION notification before presenting the payment result to the shopper.
+//       case "Refused":
+//       // Inform the shopper that the payment was refused. Ask the shopper to try the payment again using a different payment method or card.
+//
+//       case "Received":
+//         return "We've received your order, and are waiting for the payment to clear."
+//       default:
+//         text = "Please contact the condiments team";
+//     }
+  // })
+
+// Authorised, Error, Pending, PresentToShopper, Refused, Received
+
+// map to success / error / loading /ready
+
+//pending is eternal spinner, awful
+
+// dropin.setStatus('loading'); // start the loading state
+
+};
 
 const initialiseCheckout =  async () => {
 

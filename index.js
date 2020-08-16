@@ -9,6 +9,8 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json())
 
 
+
+
 // //instead of app.set('view engine', 'handlebars');
 app.set('view engine', 'hbs');
 //instead of app.engine('handlebars', handlebars({
@@ -27,7 +29,13 @@ app.listen(port, () => console.log(`App listening to port ${port}`));
 
 // Main checkout page
 app.get('/checkout', (req, res) => {
-  res.render('main', {layout: 'index', CLIENT_KEY: process.env.CLIENT_KEY,  listExists: true});
+
+  res.render('main', {
+    layout: 'index',
+    CLIENT_KEY: process.env.CLIENT_KEY,
+    listExists: true
+  });
+
 });
 
 // MAIN TEST ROUTE
@@ -37,9 +45,9 @@ app.get('/api/payment_methods', async (req, res) => {
     url: 'https://checkout-test.adyen.com/v53/paymentMethods',
     data: {
       "merchantAccount": "AdyenRecruitmentCOM",
-      "countryCode": "NL",
+      "countryCode": "AU",
       "amount": {
-        "currency": "EUR",
+        "currency": "AU",
         "value": 1000
       },
       "channel": "Web",
@@ -68,12 +76,12 @@ app.post('/api/create_payment', async (req, res) => {
       url: 'https://checkout-test.adyen.com/v53/payments',
       data: {
         "amount":{
-          "currency":"EUR",
+          "currency":"AUD",
           "value":1000
         },
         "reference":"YOUR_ORDER_NUMBER",
         "paymentMethod": req.body.paymentMethod,
-        "returnUrl":"https://example.com/checkout?shopperOrder=12xy..",
+        "returnUrl":"http://localhost:5000/checkout",
         "merchantAccount":"AdyenRecruitmentCOM"
       },
       headers: {
@@ -83,11 +91,28 @@ app.post('/api/create_payment', async (req, res) => {
     });
   // } catch(err) {
   //   // console.error(`Error: ${err.message}, error code: ${err.errorCode}`);
-  //   console.log(err);
+  //   console.log("error:", err);
   //   // ask luke what that error object is, how to orrectly access messafe
   //   //     res.status(err.statusCode).json(err.message);
   // }
-  console.log("response", response);
+console.log("yo", response);
+    res.json(response.data);
+// return "lll"
+  // makePayment(state.data)
+  //   .then(response => {
+  //     if (response.action) {
+  // //       // Drop-in handles the action object from the /payments response
+  // //       dropin.handleAction(response.action);
+  //     } else {
+  //       // Your function to show the final result to the shopper
+  //       showFinalResult(response);
+  //     }
+    // })
+  //   .catch(error => {
+  //     throw Error(error);
+  //   });
+
+  // console.log("response action", response.data);
 
 });
 // const configuration = {
