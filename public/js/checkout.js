@@ -1,10 +1,24 @@
-console.log('hi!', AdyenCheckout);
-const initialiseCheckout =  async () => {
+// console.log('hi!', AdyenCheckout);
 
-  // Make request to our own backend API
-  // to get payments methods from Adyen gateway
-  const response = await axios.get('/api/payment_methods');
-  // console.log('payment methods response:', response);
+const initialiseCheckout = async () => {
+
+  // Make request to our own backend API to get payments methods from Adyen gateway
+  //frontend data to send to node
+  let fakeUserData = {
+    "amount": {
+      "currency": "AUD",
+      "value": 1000
+    },
+    "channel": "Web"
+  }
+
+  let response = null;
+
+  try {
+    response = await axios.post('/api/payment_methods', { fakeUserData });
+  } catch(err) {
+    console.log("error:", err);
+  }
 
   // Create config object using payment methods response and client key
   const configuration = createConfig(response.data, CLIENT_KEY);
@@ -16,6 +30,10 @@ const initialiseCheckout =  async () => {
 
 
 const createConfig = (paymentMethods, clientKey) => {
+  // I think that at this stage we would be sending
+  // amount Amount to be displayed on the Pay Button. It expects an object with the value and currency properties. For example, { value: 1000, currency: 'USD' }.
+
+
   return {
     paymentMethodsResponse: paymentMethods, // The `/paymentMethods` response from the server.
     clientKey: clientKey, // Web Drop-in versions before 3.10.1 use originKey instead of clientKey.
@@ -26,6 +44,8 @@ const createConfig = (paymentMethods, clientKey) => {
         paymentMethod: state.data.paymentMethod,
         browserInfo: state.data.browserInfo
       });
+
+
       // ask Luke: isn't this else brittle? Or, what is the best way to check that payment response has data in it, and isn't null
       console.log("plain data obj:", paymentResponse.data);
 
