@@ -1,4 +1,19 @@
-// console.log('hi!', AdyenCheckout);
+console.log('hi!', AdyenCheckout);
+const initialiseCheckout =  async () => {
+
+  // Make request to our own backend API
+  // to get payments methods from Adyen gateway
+  const response = await axios.get('/api/payment_methods');
+  // console.log('payment methods response:', response);
+
+  // Create config object using payment methods response and client key
+  const configuration = createConfig(response.data, CLIENT_KEY);
+
+  const checkout = new AdyenCheckout(configuration);
+  const dropin = checkout.create('dropin').mount('#dropin-container');
+
+};
+
 
 const createConfig = (paymentMethods, clientKey) => {
   return {
@@ -68,21 +83,6 @@ const handlePaymentGatewayResponse = (dropin, response) => {
 //pending is eternal spinner, awful
 
 // dropin.setStatus('loading'); // start the loading state
-
-};
-
-const initialiseCheckout =  async () => {
-
-  // Make request to our own backend API
-  // to get payments methods from Adyen gateway
-  const response = await axios.get('/api/payment_methods');
-  // console.log('payment methods response:', response);
-
-  // Create config object using payment methods response and client key
-  const configuration = createConfig(response.data, CLIENT_KEY);
-
-  const checkout = new AdyenCheckout(configuration);
-  const dropin = checkout.create('dropin').mount('#dropin-container');
 
 };
 

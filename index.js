@@ -17,7 +17,7 @@ app.set('view engine', 'hbs');
 app.engine('hbs', handlebars({
   layoutsDir: __dirname + '/views/layouts',
   extname: 'hbs',
-  defaultLayout: 'planB',
+  defaultLayout: 'main',
   //new configuration parameter
   partialsDir: __dirname + '/views/partials/',
   helpers: require("./util/helpers")
@@ -30,8 +30,7 @@ app.listen(port, () => console.log(`App listening to port ${port}`));
 // Main checkout page
 app.get('/checkout', (req, res) => {
 
-  res.render('main', {
-    layout: 'index',
+  res.render('checkout', {
     CLIENT_KEY: process.env.CLIENT_KEY,
     listExists: true
   });
@@ -217,45 +216,48 @@ console.log("yo", response);
 
 
 // Working with static data:
-// app.get('/', (req, res) => {
-//   res.render('main', {layout: 'index', condiments: working(),  listExists: true});
-// });
+app.get('/shop', (req, res) => {
+  res.render('shop', {
+    condiments: condimentsFakeAPI(),
+    listExists: true
+  });
+});
 //
 //
-// working = () => {
-//   return [
-//     {
-//       name: 'Sambal Terasi',
-//       brand: 'ABC',
-//       price: 500
-//     },
-//     {
-//       name: 'Mushroom XO',
-//       brand: 'Baishanzu',
-//       price: 200
-//     },
-//     {
-//       name: 'XXXtra Hot Chile Habanero',
-//       brand: 'El Yucateco',
-//       price: 12
-//     },
-//     {
-//       name: 'Katta Sambol',
-//       brand: 'MD',
-//       price: 90
-//     },
-//     {
-//       name: 'Chilli Jam',
-//       brand: 'Suraya',
-//       price: 19
-//     },
-//     {
-//       name: 'Eros Pista',
-//       brand: 'Univer',
-//       price: 60
-//     },
-//   ];
-// }
+condimentsFakeAPI = () => {
+  return [
+    {
+      name: 'Sambal Terasi',
+      brand: 'ABC',
+      price: 500
+    },
+    {
+      name: 'Mushroom XO',
+      brand: 'Baishanzu',
+      price: 200
+    },
+    {
+      name: 'XXXtra Hot Chile Habanero',
+      brand: 'El Yucateco',
+      price: 12
+    },
+    {
+      name: 'Katta Sambol',
+      brand: 'MD',
+      price: 90
+    },
+    {
+      name: 'Chilli Jam',
+      brand: 'Suraya',
+      price: 19
+    },
+    {
+      name: 'Eros Pista',
+      brand: 'Univer',
+      price: 60
+    },
+  ];
+}
 
 // app.get("/api/getPaymentMethods", async (req, res) => {
 //   try {
