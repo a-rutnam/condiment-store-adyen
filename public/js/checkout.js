@@ -2,8 +2,7 @@
 
 const initialiseCheckout = async () => {
 
-  // Make request to our own backend API to get payments methods from Adyen gateway
-  //frontend data to send to node
+  //frontend data to send to node. maybe unique order number needed
   let fakeUserData = {
     "amount": {
       "currency": "AUD",
@@ -14,6 +13,7 @@ const initialiseCheckout = async () => {
 
   let response = null;
 
+  // Make request to node > axios > adyen to get payments methods from Adyen gateway
   try {
     response = await axios.post('/api/payment_methods', { fakeUserData });
   } catch(err) {
@@ -21,18 +21,14 @@ const initialiseCheckout = async () => {
   }
 
   // Create config object using payment methods response and client key
-  const configuration = createConfig(response.data, CLIENT_KEY);
+  const configuration = createConfig(response.data, CLIENT_KEY, fakeUserData);
 
   const checkout = new AdyenCheckout(configuration);
   const dropin = checkout.create('dropin').mount('#dropin-container');
-
 };
 
 
 const createConfig = (paymentMethods, clientKey) => {
-  // I think that at this stage we would be sending
-  // amount Amount to be displayed on the Pay Button. It expects an object with the value and currency properties. For example, { value: 1000, currency: 'USD' }.
-
 
   return {
     paymentMethodsResponse: paymentMethods, // The `/paymentMethods` response from the server.
@@ -45,17 +41,10 @@ const createConfig = (paymentMethods, clientKey) => {
         browserInfo: state.data.browserInfo
       });
 
-
-      // ask Luke: isn't this else brittle? Or, what is the best way to check that payment response has data in it, and isn't null
-      console.log("plain data obj:", paymentResponse.data);
-
+// move this logic to backend and make less brittle
       if (paymentResponse.data.action) {
-        console.log("fff", paymentResponse.data);
-        debugger;
         dropin.handleAction(paymentResponse.data.action);
       } else {
-      // Your function to show the final result to the shopper
-        console.log("hooray:", paymentResponse.data);
         handlePaymentGatewayResponse( dropin, paymentResponse.data );
       }; //if action
     } //onSubmit

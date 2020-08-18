@@ -7,9 +7,21 @@ const axios = require('axios');
 var bodyParser = require('body-parser');
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json())
+var Datastore = require('nedb');
+var Order = new Datastore({ filename: 'orders.db', autoload: true });
 
+// Order.find({}, function (err, rows) {
+//   console.log( rows );
+// });
+//
+// var order = {
+//     order_id: null,
+//     status: 'PENDING'
+// };
 
-
+// Order.insert(order, function(err, doc) {
+//     console.log('Inserted', doc.status, 'with ID', doc._id);
+// });
 
 // //instead of app.set('view engine', 'handlebars');
 app.set('view engine', 'hbs');
@@ -73,40 +85,42 @@ condimentsFakeAPI = () => {
   ];
 }
 
-// return available payment methods
+// return available payment methods based on data sent from frontend
+let fakeUserData = null;
+
 app.post('/api/payment_methods', async (req, res) => {
 
-  // data sent from front end
-  let fakeUserData = req.body.fakeUserData
+  // data sent from front end - need to store this in my db, i think
+  fakeUserData = req.body.fakeUserData
 
-  const response = await axios({
-    method: 'POST',
-    url: 'https://checkout-test.adyen.com/v53/paymentMethods',
-    data: {
-      "merchantAccount": "AdyenRecruitmentCOM",
-      "countryCode": "AU",
-      "amount": {
-        "currency": fakeUserData.amount.currency,
-        "value": fakeUserData.amount.value
+  let response = null;
+  try {
+    response = await axios({
+      method: 'POST',
+      url: 'https://checkout-test.adyen.com/v53/paymentMethods',
+      data: {
+        "merchantAccount": "AdyenRecruitmentCOM",
+        "countryCode": "AU",
+        "amount": {
+          "currency": fakeUserData.amount.currency,
+          "value": fakeUserData.amount.value
+        },
+        "channel": fakeUserData.channel,
+        "shopperLocale": "en-US"
       },
-      "channel": fakeUserData.channel,
-      "shopperLocale": "en-US"
-    },
-    headers: {
-      "X-API-Key": process.env.API_KEY,
-      "Content-type": "application/json"
-    },
-  });
-  // if( 'debug' in req.query ){
-  //   res.json( response.data );
-  // } else {
-  //   res.render('main', {layout: 'index', condiments: 'NOTHING YET',  listExists: true});
-  // }
+      headers: {
+        "X-API-Key": process.env.API_KEY,
+        "Content-type": "application/json"
+      },
+    })
+  } catch(err) {
+    console.log("error:", err);
+  }
 
  res.json( response.data );
 }); // end of app.get('/')
 
-// Main checkout page
+// render main checkout page with available payment methods
 app.get('/checkout', (req, res) => {
 
   res.render('checkout', {
@@ -115,23 +129,22 @@ app.get('/checkout', (req, res) => {
 
 });
 
-
-
+// make a payment
 app.post('/api/create_payment', async (req, res) => {
 
   const gatewayRequest = {
     method: 'POST',
     url: 'https://checkout-test.adyen.com/v53/payments',
     data: {
-      "amount":{
-        "currency":"AUD",
-        "value":1000
+      "amount": {
+        "currency": fakeUserData.amount.currency,
+        "value": fakeUserData.amount.value
       },
       "reference":"YOUR_ORDER_NUMBER",
       "paymentMethod": req.body.paymentMethod,
       "returnUrl":"http://localhost:5000/checkout",
       "merchantAccount":"AdyenRecruitmentCOM",
-      "channel":"web",
+      "channel": "Web",
       "additionalData":{
         "allow3DS2":true
        },
@@ -143,138 +156,13 @@ app.post('/api/create_payment', async (req, res) => {
     },
   };
 
-  console.log('=================================================');
-  console.log('REQUEST OBJECT:', gatewayRequest);
-  console.log('=================================================');
-
   let response = null;
   try {
      response = await axios( gatewayRequest);
   } catch(err) {
-    // console.error(`Error: ${err.message}, error code: ${err.errorCode}`);
     console.log("error:", err);
-  //   // ask luke what that error object is, how to orrectly access messafe
-  //   //     res.status(err.statusCode).json(err.message);
   }
-console.log("yo", response);
+
+// breakout what is actually needed here to be sent to frontend
     res.json(response.data);
-// return "lll"
-  // makePayment(state.data)
-  //   .then(response => {
-  //     if (response.action) {
-  // //       // Drop-in handles the action object from the /payments response
-  // //       dropin.handleAction(response.action);
-  //     } else {
-  //       // Your function to show the final result to the shopper
-  //       showFinalResult(response);
-  //     }
-    // })
-  //   .catch(error => {
-  //     throw Error(error);
-  //   });
-
-  // console.log("response action", response.data);
-
 });
-// const configuration = {
-//  paymentMethodsResponse: response.data.paymentMethods // The `/paymentMethods` response from the server.
-//  clientKey: process.env.CLIENT_KEY, // Web Drop-in versions before 3.10.1 use originKey instead of clientKey.
-//  locale: "en-US",
-//  environment: "test",
-//  onSubmit: (state, dropin) => {
-//      // Your function calling your server to make the `/payments` request
-//      makePayment(state.data)
-//        .then(response => {
-//          if (response.action) {
-//            // Drop-in handles the action object from the /payments response
-//            dropin.handleAction(response.action);
-//          } else {
-//            // Your function to show the final result to the shopper
-//            showFinalResult(response);
-//          }
-//        })
-//        .catch(error => {
-//          throw Error(error);
-//        });
-//    },
-//  onAdditionalDetails: (state, dropin) => {
-//    // Your function calling your server to make a `/payments/details` request
-//    makeDetailsCall(state.data)
-//      .then(response => {
-//        if (response.action) {
-//          // Drop-in handles the action object from the /payments response
-//          dropin.handleAction(response.action);
-//        } else {
-//          // Your function to show the final result to the shopper
-//          showFinalResult(response);
-//        }
-//      })
-//      .catch(error => {
-//        throw Error(error);
-//      });
-//  },
-//  paymentMethodsConfiguration: {
-//    card: { // Example optional configuration for Cards
-//      hasHolderName: true,
-//      holderNameRequired: true,
-//      enableStoreDetails: true,
-//      hideCVC: false, // Change this to true to hide the CVC field for stored cards
-//      name: 'Credit or debit card'
-//    }
-//  }
-// };
-//
-// const checkout = new AdyenCheckout(configuration);
-// const dropin = checkout.create('dropin').mount('#dropin-container');
-
-
-// i think the await should be taking care of it. show luke the object promise render, i might just be sending the wrong thing
-//The following works, don't delete til you've figured out the different try/catch format
-// async function makePostRequest() {
-//   const response = await axios({
-//     method: 'POST',
-//     url: 'https://checkout-test.adyen.com/v53/paymentMethods',
-//     data: {
-//       "merchantAccount": "AdyenRecruitmentCOM",
-//       "countryCode": "NL",
-//       "amount": {
-//         "currency": "EUR",
-//         "value": 1000
-//       },
-//       "channel": "Web",
-//       "shopperLocale": "nl-NL"
-//     },
-//     headers: {
-//       "X-API-Key": process.env.API_KEY,
-//       "Content-type": "application/json"
-//     },
-//   });
-//
-//   response.data.paymentMethods.forEach(item => console.log('item', item));
-//   // console.log(response.data.groups);
-//
-//   return response.data
-// }
-//
-//
-//
-  // makePostRequest();
-
-  // response.data.paymentMethods.forEach(item => console.log('item', item));
-  // console.log(response.data.groups);
-
-
-
-
-// app.get("/api/getPaymentMethods", async (req, res) => {
-//   try {
-//     const response = await checkout.paymentMethods({
-//       channel: "Web",
-//       merchantAccount: process.env.MERCHANT_ACCOUNT
-//     });
-//     res.json(response);
-//   } catch (err) {
-//     console.error(`Error: ${err.message}, error code: ${err.errorCode}`);
-//     res.status(err.statusCode).json(err.message);
-//   }
-// });
