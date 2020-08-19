@@ -36,16 +36,20 @@ const createConfig = (paymentMethods, clientKey) => {
     locale: "en-US",
     environment: "test",
     onSubmit: async (state, dropin) => {
-      const paymentResponse = await axios.post('/api/create_payment', {
-        paymentMethod: state.data.paymentMethod,
-        browserInfo: state.data.browserInfo
-      });
+      try {
+        const paymentResponse = await axios.post('/api/create_payment', {
+          paymentMethod: state.data.paymentMethod,
+          browserInfo: state.data.browserInfo
+        });
 
-      if (paymentResponse.data.action) {
-        dropin.handleAction(paymentResponse.data.action);
-      } else {
-        handlePaymentGatewayResponse( dropin, paymentResponse.data );
-      }; //if response includes action
+        if (paymentResponse.data.action) {
+          dropin.handleAction(paymentResponse.data.action);
+        } else {
+          handlePaymentGatewayResponse( dropin, paymentResponse.data );
+        }; //if response includes action
+      } catch(err) {
+        console.log(err);
+      };
     } //onSubmit
   }; //return
 }; // getConfig()

@@ -85,13 +85,12 @@ condimentsFakeAPI = () => {
   ];
 }
 
-// return available payment methods based on data sent from frontend
 let fakeUserData = null;
-
+// get available payment methods from Adyen
 app.post('/api/payment_methods', async (req, res) => {
 
-  // data sent from front end - need to store this in my db, i think
-  fakeUserData = req.body.fakeUserData
+  // data sent from front end regarding purchase
+  fakeUserData = req.body.fakeUserData;
 
   let response = null;
   try {
@@ -158,15 +157,15 @@ app.post('/api/create_payment', async (req, res) => {
 
   let response = null;
   try {
-    response = await axios( gatewayRequest);
+    response = await axios( gatewayRequest );
 
     if (response.data.action) {
-      res.json(response.data);
+      res.json({ action: response.data.action });
 
     } else {
       let resultCode = response.data.resultCode;
       let dropinArgs = [];
-      
+
       switch (resultCode) {
         case "Authorised":
           dropinArgs.push('success', { message: 'Payment successful!' });
@@ -190,7 +189,7 @@ app.post('/api/create_payment', async (req, res) => {
       }; //switch
 
       res.json(dropinArgs)
-    }; //if action
+    }; //if there is an action
 
   } catch(err) {
     res.status(500).send(err.response.data.message)
