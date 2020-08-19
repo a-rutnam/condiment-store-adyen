@@ -53,46 +53,30 @@ const createConfig = (paymentMethods, clientKey) => {
 
 const handlePaymentGatewayResponse = (dropin, response) => {
   console.log("handlePaymentGatewayResponse:", response);
-  // dropin.setStatus('success', { message: 'Payment successful!' });
-
-  // dropin.setStatus('loading'); // start the loading state
 
   let resultCode = response.resultCode;
 
-
-// use spread to send args to dropin.setStatus
-
-//     switch (resultCode) {
-//       case "Authorised":
-//         return ['success', { message: 'Payment successful!' }]
-//       case "Error":
-//       // ideally library would present the docs info here i.e. not supported means "The shopper's bank does not support or does not allow this type of transaction."
-//         return ["error", `${response.data.refusalReason} - More info here https://docs.adyen.com/development-resources/refusal-reasons`]
-//       case "Pending":
-//       // ideally i'd want seller to say we will contact you when payment is completed
-//         return "We've received your order, and are waiting for the payment to be completed."
-//       case "PresentToShopper":
-// //       For a voucher payment method, inform the shopper that you are waiting for their payment. You will receive the final result of the payment in an AUTHORISATION notification.
-// //
-// // For a qrCode payment method, wait for the AUTHORISATION notification before presenting the payment result to the shopper.
-//       case "Refused":
-//       // Inform the shopper that the payment was refused. Ask the shopper to try the payment again using a different payment method or card.
-//
-//       case "Received":
-//         return "We've received your order, and are waiting for the payment to clear."
-//       default:
-//         text = "Please contact the condiments team";
-//     }
-  // })
-
-// Authorised, Error, Pending, PresentToShopper, Refused, Received
-
-// map to success / error / loading /ready
-
-//pending is eternal spinner, awful
-
-// dropin.setStatus('loading'); // start the loading state
-
+  switch (resultCode) {
+    case "Authorised":
+      dropin.setStatus('success', { message: 'Payment successful!' });
+      break;
+    case "Error":
+      dropin.setStatus('error', { message: `${response.data.refusalReason} - More info here https://docs.adyen.com/development-resources/refusal-reasons`});
+      break;
+    case "Refused":
+      dropin.setStatus('error', { message: "Payment was refused. Please try again using a different payment method or card." });
+      break;
+    case "Pending":
+    // not sure about using the eternal spinner here and for received:
+      dropin.setStatus('loading', { message: "We've received your order, and are waiting for the payment to be completed." });
+      break;
+    case "Received":
+      dropin.setStatus('loading', { message: "We've received your order, and are waiting for the payment to clear." });
+      break;
+    default:
+      dropin.setStatus('loading', { message: "Please contact the condiments team." });
+      break;
+  }; //switch
 };
 
 
