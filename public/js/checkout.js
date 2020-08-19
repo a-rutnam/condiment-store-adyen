@@ -55,8 +55,7 @@ const createConfig = (paymentMethods, clientKey) => {
 }; // getConfig()
 
 const handlePaymentGatewayResponse = (dropin, response) => {
-
-  dropin.setStatus(...response)
+  dropin.setStatus(response.status, response.message);
 };
 
 

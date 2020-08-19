@@ -162,37 +162,83 @@ app.post('/api/create_payment', async (req, res) => {
     if (response.data.action) {
       res.json({ action: response.data.action });
 
+// figure out what this does https://docs.adyen.com/checkout/drop-in-web/tutorial-node-js#initiatepayment
+      res.cookie("paymentData", response.data.action.paymentData);
+
     } else {
       let resultCode = response.data.resultCode;
-      let dropinArgs = [];
 
-      switch (resultCode) {
-        case "Authorised":
-          dropinArgs.push('success', { message: 'Payment successful!' });
-          break;
-        case "Error":
-          dropinArgs.push('error', { message: `${response.data.refusalReason} - More info here https://docs.adyen.com/development-resources/refusal-reasons`});
-          break;
-        case "Refused":
-          dropinArgs.push('error', { message: "Payment was refused. Please try again using a different payment method or card." });
-          break;
-        case "Pending":
-        // not sure about using the eternal spinner here and for received:
-          dropinArgs.push('loading', { message: "We've received your order, and are waiting for the payment to be completed." });
-          break;
-        case "Received":
-          dropinArgs.push('loading', { message: "We've received your order, and are waiting for the payment to clear." });
-          break;
-        default:
-          dropinArgs.push('loading', { message: "Please contact the condiments team." });
-          break;
-      }; //switch
+      const dropinResponse = mapResultCodeToDropinMessage( response.data );
+      res.json( dropinResponse );
 
-      res.json(dropinArgs)
+      // let dropinArgs = [];
+      //
+      // switch (resultCode) {
+      //   case "Authorised":
+      //     dropinArgs.push('success', { message: 'Payment successful!' });
+      //     break;
+      //   case "Error":
+      //     dropinArgs.push('error', { message: `${response.data.refusalReason} - More info here https://docs.adyen.com/development-resources/refusal-reasons`});
+      //     break;
+      //   case "Refused":
+      //     dropinArgs.push('error', { message: "Payment was refused. Please try again using a different payment method or card." });
+      //     break;
+      //   case "Pending":
+      //   // not sure about using the eternal spinner here and for received:
+      //     dropinArgs.push('loading', { message: "We've received your order, and are waiting for the payment to be completed." });
+      //     break;
+      //   case "Received":
+      //     dropinArgs.push('loading', { message: "We've received your order, and are waiting for the payment to clear." });
+      //     break;
+      //   default:
+      //     dropinArgs.push('error', { message: "Please contact the condiments team." });
+      //     break;
+      // }; //switch
+      //
+      // res.json(dropinArgs)
     }; //if there is an action
 
   } catch(err) {
     res.status(500).send(err.response.data.message)
     // example error - change currency to NL and use poli: "error: Unsupported currency specified" This reflects bad config on merchant's behalf, so what should end user see?
   }
-});
+
+}); // GET /api/create_payment
+``
+const mapResultCodeToDropinMessage = function( response ){
+  const map = {
+    "Authorised": {
+      status: 'success',
+      message: 'Payment successful!'
+    },
+    "Error": {
+      status: 'error',
+      message: `${response.refusalReason} - More info here https://docs.adyen.com/development-resources/refusal-reasons`
+    },
+    "Refused": {
+      status: 'error',
+      message: "Payment was refused. Please try again using a different payment method or card."
+    },
+    "Pending": {
+    // not sure about using the eternal spinner here and for received:
+      status: 'loading',
+      message: "We've received your order, and are waiting for the payment to be completed."
+    },
+    "Received": {
+      status: 'loading',
+      message: "We've received your order, and are waiting for the payment to clear."
+    }
+  }; //map
+
+  const mappedResponse = map[ response.resultCode ];
+  if( mappedResponse !== undefined){
+    return mappedResponse;
+  } else {
+    // custom response for unknown resultCode value
+    return {
+      status: 'error',
+      message: "Please contact the condiments team."
+    };
+  }
+
+}; // mapResultCodeToDropinMessage()
