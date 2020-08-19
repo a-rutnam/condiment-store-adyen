@@ -158,11 +158,42 @@ app.post('/api/create_payment', async (req, res) => {
 
   let response = null;
   try {
-     response = await axios( gatewayRequest);
-  } catch(err) {
-    console.log("error:", err);
-  }
+    response = await axios( gatewayRequest);
 
-// breakout what is actually needed here to be sent to frontend
-    res.json(response.data);
+    if (response.data.action) {
+      res.json(response.data);
+
+    } else {
+      let resultCode = response.data.resultCode;
+      let dropinArgs = [];
+      
+      switch (resultCode) {
+        case "Authorised":
+          dropinArgs.push('success', { message: 'Payment successful!' });
+          break;
+        case "Error":
+          dropinArgs.push('error', { message: `${response.data.refusalReason} - More info here https://docs.adyen.com/development-resources/refusal-reasons`});
+          break;
+        case "Refused":
+          dropinArgs.push('error', { message: "Payment was refused. Please try again using a different payment method or card." });
+          break;
+        case "Pending":
+        // not sure about using the eternal spinner here and for received:
+          dropinArgs.push('loading', { message: "We've received your order, and are waiting for the payment to be completed." });
+          break;
+        case "Received":
+          dropinArgs.push('loading', { message: "We've received your order, and are waiting for the payment to clear." });
+          break;
+        default:
+          dropinArgs.push('loading', { message: "Please contact the condiments team." });
+          break;
+      }; //switch
+
+      res.json(dropinArgs)
+    }; //if action
+
+  } catch(err) {
+    res.status(500).send(err.response.data.message)
+    // example error - change currency to NL and use poli: "error: Unsupported currency specified" This reflects bad config on merchant's behalf, so what should end user see?
+  }
 });

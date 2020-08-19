@@ -2,7 +2,7 @@
 
 const initialiseCheckout = async () => {
 
-  //frontend data to send to node. maybe unique order number needed
+  //frontend data to send to node. maybe unique order number needed - how should I best set this up for Adyen to flick through different options e.g. a bad data request with wrong currency for payment method
   let fakeUserData = {
     "amount": {
       "currency": "AUD",
@@ -41,42 +41,18 @@ const createConfig = (paymentMethods, clientKey) => {
         browserInfo: state.data.browserInfo
       });
 
-// move this logic to backend and make less brittle
       if (paymentResponse.data.action) {
         dropin.handleAction(paymentResponse.data.action);
       } else {
         handlePaymentGatewayResponse( dropin, paymentResponse.data );
-      }; //if action
+      }; //if response includes action
     } //onSubmit
   }; //return
 }; // getConfig()
 
 const handlePaymentGatewayResponse = (dropin, response) => {
-  console.log("handlePaymentGatewayResponse:", response);
 
-  let resultCode = response.resultCode;
-
-  switch (resultCode) {
-    case "Authorised":
-      dropin.setStatus('success', { message: 'Payment successful!' });
-      break;
-    case "Error":
-      dropin.setStatus('error', { message: `${response.data.refusalReason} - More info here https://docs.adyen.com/development-resources/refusal-reasons`});
-      break;
-    case "Refused":
-      dropin.setStatus('error', { message: "Payment was refused. Please try again using a different payment method or card." });
-      break;
-    case "Pending":
-    // not sure about using the eternal spinner here and for received:
-      dropin.setStatus('loading', { message: "We've received your order, and are waiting for the payment to be completed." });
-      break;
-    case "Received":
-      dropin.setStatus('loading', { message: "We've received your order, and are waiting for the payment to clear." });
-      break;
-    default:
-      dropin.setStatus('loading', { message: "Please contact the condiments team." });
-      break;
-  }; //switch
+  dropin.setStatus(...response)
 };
 
 
