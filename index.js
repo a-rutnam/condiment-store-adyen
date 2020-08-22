@@ -11,29 +11,13 @@ app.use(bodyParser.json())
 var Datastore = require('nedb');
 var Order = new Datastore({ filename: 'orders.db', autoload: true });
 var crypto = require("crypto");
-let order_id = null;
 const cookieParser = require("cookie-parser");
 app.use(cookieParser());
 
 
 console.log("/////////////////////////////////////////////////Restart");
 
-// Order.find({}, function (err, rows) {
-//   console.log( rows );
-// });
-//
-// var order = {
-//     order_id: null,
-//     status: 'PENDING'
-// };
-
-// Order.insert(order, function(err, doc) {
-//     console.log('Inserted', doc.status, 'with ID', doc._id);
-// });
-
-// //instead of app.set('view engine', 'handlebars');
 app.set('view engine', 'hbs');
-//instead of app.engine('handlebars', handlebars({
 app.engine('hbs', handlebars({
   layoutsDir: __dirname + '/views/layouts',
   extname: 'hbs',
@@ -45,37 +29,27 @@ app.engine('hbs', handlebars({
 
 app.use(express.static('public'))
 
+// Start the server listening
 app.listen(port, () => console.log(`App listening to port ${port}`));
 
-
-
-
-let fakeUserData = null;
-
-
-// render main checkout page with available payment methods
+// PAYMENT PROCESS BEGINS HERE:
+//
+// GET /checkout: render main checkout page
 app.get('/checkout', (req, res) => {
-  // console.log("index.js, GET /checkout");
-  // console.log("req.body", req.body);
-  // console.log("----------------------------------------");
-
-  res.render('checkout', {
-    CLIENT_KEY: process.env.CLIENT_KEY
-    // CLIENT_KEY: process.env.CLIENT_KEY,
-    // purchaseData: req.body
-  });
+  // Pull CLIENT_KEY from .env file and forward to frontend (avoid GitHub publishing)
+  res.render('checkout', { CLIENT_KEY: process.env.CLIENT_KEY });
 });
 
-// get available payment methods from Adyen
-// this is the first time we get the fakeUserData in the req object:
+
+// API routes /////////////////////////////////////////////////////////////////
+
+// POST /api/payment_methods: retrieve available payment methods from Adyen
 app.post('/api/payment_methods', async (req, res) => {
-  // console.log("index.js, POST /api/payment_methods");
-  // console.log("req.body:", req.body);
-  // console.log("----------------------------------------");
 
-  // data sent from front end regarding purchase
-  fakeUserData = req.body.fakeUserData;
+  // data sent from frontend regarding purchase
+  const fakeUserData = req.body.fakeUserData;
 
+  // TODO: Store in the same format as it's received
   let order = {
     "currency": fakeUserData.amount.currency,
     "value": fakeUserData.amount.value,
@@ -83,43 +57,39 @@ app.post('/api/payment_methods', async (req, res) => {
   };
 
   Order.insert(order, async function(err, doc) {
-    order_id = doc._id;
+    // On successful save: set cookie, make Adyen request
+    res.cookie("order_id", doc._id); // For future DB updates
     try {
       const paymentMethodsResponse = await api.getPaymentMethods( fakeUserData );
       res.json( paymentMethodsResponse.data );
-    } catch(err) {
-      console.log("error:", err);
+    } catch(e) {
+      // TODO: error reporting in console, save to DB?
+      res.json( e );
     }
 
-// there iss notthing worth databasing in the response data, so I think update should go in checkout method
-//     Order.update({_id: order_id}, { $set: { channel: 'solar system' } }, { multi: true }, function (err, numReplaced) {
-//   console.log("error:", err);
-//   console.log("numReplaced:", numReplaced);
-//   console.log("order_id at time of update:", order_id);
-// });
+    // just keep for syntax:
+    // Order.update({_id: order_id}, { $set: { channel: 'solar system' } }, { multi: false }, function (err, numReplaced) {});
+
+  }); // Order.insert success callback
+
+}); // app.post('/api/payment_methods')
 
 
-  }); // end of Insert
-
-}); // end of app.get('/')
-
-
-// make a payment
+// POST /api/create_payment: make a payment
 app.post('/api/create_payment', async (req, res) => {
-  // console.log("index.js, POST /api/create_payment");
-  // console.log("req.body:", req.body);
-  // console.log("----------------------------------------");
   const gatewayRequest = {
     method: 'POST',
+    // TODO: extract base URL to config constant
     url: 'https://checkout-test.adyen.com/v53/payments',
     data: {
-      "amount": {
-        "currency": fakeUserData.amount.currency,
-        "value": fakeUserData.amount.value
+      amount: {
+        // TODO: remove quotes from keys
+        "currency": req.body.amount.currency,
+        "value": req.body.amount.value
       },
-      "reference":"YOUR_ORDER_NUMBER",
+      "reference":"YOUR_ORDER_NUMBER", //TODO: need to use DB order_id?
       "paymentMethod": req.body.paymentMethod,
-      "returnUrl":"http://localhost:5000/handleShopperRedirect",
+      "returnUrl": "http://localhost:5000/handleShopperRedirect", //TODO: config const?
       "merchantAccount":"AdyenRecruitmentCOM",
       "channel": "Web",
       "additionalData":{
@@ -134,8 +104,10 @@ app.post('/api/create_payment', async (req, res) => {
   };
 
   try {
+
     const createPaymentResponse = await api.createPayment( gatewayRequest );
 
+    // TODO: remove this conditional if possible
     if (createPaymentResponse.data.action) {
 
       res.cookie("paymentData", createPaymentResponse.data.action.paymentData);
@@ -148,13 +120,12 @@ app.post('/api/create_payment', async (req, res) => {
       const dropinResponse = mapResultCodeToDropinMessage( resultCode );
 
       res.json( dropinResponse );
-    };     //if there is an action
-  } catch(err) {
-// thiss is running everytime and throwing ""Cannot set headers after they are sent to the client"" error
-    // res.status(500).send(err.response.data.message)
+    }    //if there is an action
 
-    console.log("create payment error:", err);
+  } catch(e) {
+    res.json( e );
   }
+
 }); // GET /api/create_payment
 
 const mapResultCodeToDropinMessage = function( response ){
@@ -183,10 +154,11 @@ const mapResultCodeToDropinMessage = function( response ){
   }; //map
 
   const mappedResponse = map[ response ];
+
   if( mappedResponse !== undefined){
     return mappedResponse;
   } else {
-    // custom response for unknown resultCode value
+    // custom response for unknown resultCode value (undefined key)
     return {
       status: 'error',
       message: "Please contact the condiments team."
@@ -195,113 +167,44 @@ const mapResultCodeToDropinMessage = function( response ){
 
 }; // mapResultCodeToDropinMessage()
 
-// this is the returnUrl that we give to
-// redirecting actions like POLI
+
+// (ALL) /handleShopperRedirect: the returnUrl that we give to POLI
+// to redirect browser to, after POLI processing
 app.all("/handleShopperRedirect", async (req, res) => {
 
-  if( req.method === 'POST'){
-    reqStuff = req.body
-  } else {
-    reqStuff = req.query
-  }
+  // TODO: rename this
+  const reqStuff = (req.method === 'POST') ? req.body : req.query;
 
-  let payload = {};
-  payload["details"] = {payload: reqStuff.payload}; //docs indicate this is deprecated
-  payload["paymentData"] = req.cookies["paymentData"];
-  payload["url"] = "https://checkout-test.adyen.com/v53/payments/details"
-  payload["method"] = "POST"
-  payload["headers"] = {
-    "X-API-Key": process.env.API_KEY,
-    "Content-type": "application/json"
-  }
+  // TODO: object literal
+  const payload = {
+    details: { payload: reqStuff.payload },
+    paymentData: req.cookies["paymentData"],
+    url: "https://checkout-test.adyen.com/v53/payments/details",
+    method: "POST",
+    headers: {
+      "X-API-Key": process.env.API_KEY,
+      "Content-type": "application/json"
+    }
+  };
 
   try {
     let response = await api.createRedirectPayment( payload, reqStuff );
-
-    console.log("redirectPaymentResponse:", response);
-
-    res.redirect(`/final-status?${response.data.resultCode}`);
+    // TODO: anything else to clean up here?
+    // ********* Possible action key check & handling?
+    res.clearCookie("paymentData");
+    res.clearCookie("order_id");
+    res.redirect(`/final-status?resultCode=${response.data.resultCode}`);
 
   } catch (e) {
-    console.log('ERROR with redirectPaymentResponse');
-    console.dir(e);
+    // TODO: log and save to db?
     res.json( e );
   }
 
-});
+}); // app.all("/handleShopperRedirect")
 
+
+// GET /final-status: above route directs here after Adyen query
+// TODO: Possibly use res.redirect() switch here as in docs
 app.get("/final-status", (req, res) => {
-  res.render('final-status')
+  res.render('final-status');
 });
-
-
-
-// condimentsFakeAPI = () => {
-//   return [
-//     {
-//       name: 'Sambal Terasi',
-//       brand: 'ABC',
-//       price: 500,
-//       product_id: 09032,
-//       currency: "AUD"
-//     },
-//     {
-//       name: 'Mushroom XO',
-//       brand: 'Baishanzu',
-//       price: 200,
-//       product_id: 12341,
-//       currency: "NL"
-//     },
-//     {
-//       name: 'XXXtra Hot Chile Habanero',
-//       brand: 'El Yucateco',
-//       price: 12,
-//       product_id: 6856,
-//       currency: "AUD"
-//     },
-//     {
-//       name: 'Katta Sambol',
-//       brand: 'MD',
-//       price: 90,
-//       product_id: 090342,
-//       currency: "AUD"
-//     },
-//     {
-//       name: 'Chilli Jam',
-//       brand: 'Suraya',
-//       price: 19,
-//       product_id: 7452,
-//       currency: "AUD"
-//     },
-//     {
-//       name: 'Eros Pista',
-//       brand: 'Univer',
-//       price: 60,
-//       product_id: 3221,
-//       currency: "AUD"
-//     },
-//   ];
-// }
-// // shop with condiments:
-// app.get('/shop', (req, res) => {
-//   console.log("Index.js GET /shop");
-//   res.render('shop', {
-//     condiments: condimentsFakeAPI(),
-//     listExists: true
-//   });
-// });
-//
-// let purchaseData = null;
-
-// app.post('/purchaseData', (req, res) => {
-//   purchaseData = {
-//     product_id: req.body.product_id,
-//     price: req.body.price,
-//     currency: req.body.currency
-//   }
-//
-//   // res.render('shop', {
-//   //   condiments: condimentsFakeAPI(),
-//   //   listExists: true
-//   // });
-// });

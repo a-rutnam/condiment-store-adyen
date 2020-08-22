@@ -1,64 +1,69 @@
+// const api = require('./lib/merchant_api');
+const MERCHANT_API_PAYMENT_METHODS_URL = '/api/payment_methods';
+const MERCHANT_API_CREATE_PAYMENT_URL = '/api/create_payment';
+
 console.log('hi!', AdyenCheckout);
+const fakeUserData = {
+  amount: {
+    currency: "AUD",
+    value: 1000
+  },
+  channel: "Web"
+};
 
-const initialiseCheckout = async () => {
+document.addEventListener("DOMContentLoaded",  async () => {
 
-  //frontend data to send to node. maybe unique order number needed - how should I best set this up for Adyen to flick through different options e.g. a bad data request with wrong currency for payment method
-  let fakeUserData = {
-    "amount": {
-      "currency": "AUD",
-      "value": 1000
-    },
-    "channel": "Web"
-  }
+  // TODO: frontend data to send to node. maybe unique order number needed - how should I best set this up for Adyen to flick through different options e.g. a bad data request with wrong currency for payment method
 
-  let response = null;
-
-  // Make request to node > axios > adyen to get payments methods from Adyen gateway
+  // Make request to merchant server which forwards request to Adyen gateway
   try {
-    response = await axios.post('/api/payment_methods', { fakeUserData });
+
+    const response = await axios.post(MERCHANT_API_PAYMENT_METHODS_URL, { fakeUserData });
+
+    // Use response to build checkout UI
+    const configuration = createConfig(response.data, CLIENT_KEY);
+    const checkout = new AdyenCheckout(configuration);
+    const dropin = checkout.create('dropin').mount('#dropin-container');
+
   } catch(err) {
     console.log("error:", err);
   }
 
-  const configuration = createConfig(response.data, CLIENT_KEY);
+}); // DOM ready handler
 
-  const checkout = new AdyenCheckout(configuration);
-
-  const dropin = checkout.create('dropin').mount('#dropin-container');
-};
-
-
+// Convenience function to create config object,
+// passing in the required fields
 const createConfig = (paymentMethods, clientKey) => {
 
   return {
-    paymentMethodsResponse: paymentMethods, // The `/paymentMethods` response from the server.
-    clientKey: clientKey, // Web Drop-in versions before 3.10.1 use originKey instead of clientKey.
+    paymentMethodsResponse: paymentMethods,
+    clientKey: clientKey,
     locale: "en-US",
     environment: "test",
     onSubmit: async (state, dropin) => {
       try {
-        const paymentResponse = await axios.post('/api/create_payment', {
+
+        const paymentResponse = await axios.post(MERCHANT_API_CREATE_PAYMENT_URL, {
           paymentMethod: state.data.paymentMethod,
-          browserInfo: state.data.browserInfo
+          browserInfo: state.data.browserInfo,
+          // reuse fakeUserData from payment_methods call
+          ...fakeUserData
         });
 
-
-// this needs to start over if the redirect returns an action again
+        // TODO: this needs to start over if the redirect returns an action again
         if (paymentResponse.data.action) {
           dropin.handleAction(paymentResponse.data.action);
         } else {
-          handlePaymentGatewayResponse( dropin, paymentResponse.data );
-        }; //if response includes action
+          // Report status to UI
+          dropin.setStatus(paymentResponse.data.status, paymentResponse.data.message);
+        }
+
       } catch(err) {
-        console.log(err);
-      };
-    } //onSubmit
+        // TODO: report error to UI
+        console.dir(err);
+      }
+
+    } //onSubmit handler
   }; //return
-}; // getConfig()
 
-const handlePaymentGatewayResponse = (dropin, response) => {
-  dropin.setStatus(response.status, response.message);
-};
-
-
-document.addEventListener("DOMContentLoaded", initialiseCheckout);
+}; // createConfig()
