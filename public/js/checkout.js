@@ -1,4 +1,4 @@
-// console.log('hi!', AdyenCheckout);
+console.log('hi!', AdyenCheckout);
 
 const initialiseCheckout = async () => {
 
@@ -20,10 +20,10 @@ const initialiseCheckout = async () => {
     console.log("error:", err);
   }
 
-  // Create config object using payment methods response and client key
-  const configuration = createConfig(response.data, CLIENT_KEY, fakeUserData);
+  const configuration = createConfig(response.data, CLIENT_KEY);
 
   const checkout = new AdyenCheckout(configuration);
+
   const dropin = checkout.create('dropin').mount('#dropin-container');
 };
 
@@ -42,6 +42,8 @@ const createConfig = (paymentMethods, clientKey) => {
           browserInfo: state.data.browserInfo
         });
 
+
+// this needs to start over if the redirect returns an action again
         if (paymentResponse.data.action) {
           dropin.handleAction(paymentResponse.data.action);
         } else {

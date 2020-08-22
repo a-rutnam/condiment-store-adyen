@@ -1,7 +1,51 @@
-{{#if listExists}}
-  <ul>
-    {{#each condiments}}
-      <li>{{this.name}}</li>
-    {{/each}}
-  </ul>
-{{/if}}
+<div class="container">
+
+
+  {{#if listExists}}
+    <ul>
+      {{#each condiments}}
+      <div class="row">
+        <div class="two-thirds column">
+          {{this.name}}, {{this.price}}
+        </div>
+        <div class="one-third column">
+          <form id="myForm" action="" method="post">
+          <!-- <form action=/purchaseData method=post> -->
+<!-- can the value be an array of amount, price, item_id -->
+            <label for="exampleRecipientInput">Amount</label>
+            <select
+              class="u-full-width" id="exampleRecipientInput"
+              name="amount">
+              <option value=1>One</option>
+              <option value=2>Two</option>
+              <option value=3>Three</option>
+            </select>
+            <input
+              class="button-primary"
+              type="submit"
+              onclick="myFunction()"
+              value="Submit">
+            <!-- <input
+              class="button-primary"
+              type="submit"
+              value="Submit"> -->
+            <input
+              type="hidden"
+              name="product_id" id="hiddenInput" value={{this.product_id}} />
+            <input
+              type="hidden"
+              name="price" id="hiddenInput"
+              value={{this.price}} />
+            <input
+              type="hidden"
+              name="currency" id="hiddenInput"
+              value={{this.currency}} />
+          </form>
+        </div>
+      </div>
+
+
+      {{/each}}
+    </ul>
+  {{/if}}
+</div>
