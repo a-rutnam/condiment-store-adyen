@@ -7,3 +7,7 @@ list-style: none
 }
 .midlaner {background-color: #eeeeee}
 .toplaner {background-color: #ffea00}
+
+.column, .columns {
+  float: none !important;
+}

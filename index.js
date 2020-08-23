@@ -14,6 +14,10 @@ var crypto = require("crypto");
 const cookieParser = require("cookie-parser");
 app.use(cookieParser());
 
+Order.find({}, (err, docs)=>{
+  console.log('ORDERS:', docs);
+});
+
 
 console.log("/////////////////////////////////////////////////Restart");
 
@@ -43,34 +47,55 @@ app.get('/checkout', (req, res) => {
 
 // API routes /////////////////////////////////////////////////////////////////
 
+// TODO: replace all 'function's with arrow functions
+
 // POST /api/payment_methods: retrieve available payment methods from Adyen
 app.post('/api/payment_methods', async (req, res) => {
 
-  // data sent from frontend regarding purchase
-  const fakeUserData = req.body.fakeUserData;
 
-  // TODO: Store in the same format as it's received
-  let order = {
-    "currency": fakeUserData.amount.currency,
-    "value": fakeUserData.amount.value,
-    "channel": fakeUserData.channel
-  };
+  // For use in DB update in 'finally':
+  let paymentMethodsResponse = {}, orderStatus = '';
 
-  Order.insert(order, async function(err, doc) {
-    // On successful save: set cookie, make Adyen request
-    res.cookie("order_id", doc._id); // For future DB updates
-    try {
-      const paymentMethodsResponse = await api.getPaymentMethods( fakeUserData );
+  try {
+
+    paymentMethodsResponse = await api.getPaymentMethods( req.body.fakeUserData );
+    orderStatus = 'PAYMENT_METHODS_RECEIVED_SUCCESS'; // for DB update
+
+  } catch(e) {
+
+    orderStatus = 'PAYMENT_METHODS_RECEIVED_FAILURE';
+    // Store error into response for DB in finally
+    paymentMethodsResponse.data = e.response.data;
+
+  } finally {
+
+    const orderDoc = {
+      status: orderStatus,
+      user_id: 12345, // Fake placeholder
+
+      // Also use the order document to store all the
+      // Adyen request & response data, for auditing/logging
+      adyenData: {
+        paymentMethods: {
+          // Axios gives us original request body in config.data,
+          // but we want to save to DB as an actual JS object,
+          // hence the JSON.parse:
+          request: JSON.parse(paymentMethodsResponse.config.data),
+          response: paymentMethodsResponse.data
+        }
+      }
+    };
+
+    Order.insert(orderDoc, (err, doc) => {
+
+      // On successful save of Order record, set cookie
+      // and forward JSON response to frontend AJAX
+      res.cookie("order_id", doc._id); // For future DB updates
       res.json( paymentMethodsResponse.data );
-    } catch(e) {
-      // TODO: error reporting in console, save to DB?
-      res.json( e );
-    }
 
-    // just keep for syntax:
-    // Order.update({_id: order_id}, { $set: { channel: 'solar system' } }, { multi: false }, function (err, numReplaced) {});
+    }); // Order.create
 
-  }); // Order.insert success callback
+  } // finally
 
 }); // app.post('/api/payment_methods')
 
