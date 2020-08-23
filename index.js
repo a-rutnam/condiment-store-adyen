@@ -14,10 +14,6 @@ var crypto = require("crypto");
 const cookieParser = require("cookie-parser");
 app.use(cookieParser());
 
-Order.find({}, (err, docs)=>{
-  console.log('ORDERS:', docs);
-});
-
 
 console.log("/////////////////////////////////////////////////Restart");
 
@@ -30,6 +26,7 @@ app.engine('hbs', handlebars({
   partialsDir: __dirname + '/views/partials/',
   helpers: require("./util/helpers")
 }));
+
 
 app.use(express.static('public'))
 
@@ -44,10 +41,18 @@ app.get('/checkout', (req, res) => {
   res.render('checkout', { CLIENT_KEY: process.env.CLIENT_KEY });
 });
 
+// GET /admin: order reporting/logs
+app.get('/admin', (req, res) => {
+  Order.find({}, (err, orders) => {
+    console.log({orders});
+    res.render('admin', {orders: orders});
+  })
+}); // app.get('/admin')
+
 
 // API routes /////////////////////////////////////////////////////////////////
 
-// TODO: replace all 'function's with arrow functions
+
 
 // POST /api/payment_methods: retrieve available payment methods from Adyen
 app.post('/api/payment_methods', async (req, res) => {
@@ -82,7 +87,12 @@ app.post('/api/payment_methods', async (req, res) => {
           // hence the JSON.parse:
           request: JSON.parse(paymentMethodsResponse.config.data),
           response: paymentMethodsResponse.data
-        }
+        },
+        createPayment: {
+          request: {},
+          response: {}
+        },
+        resultCode: ''
       }
     };
 
@@ -93,7 +103,7 @@ app.post('/api/payment_methods', async (req, res) => {
       res.cookie("order_id", doc._id); // For future DB updates
       res.json( paymentMethodsResponse.data );
 
-    }); // Order.create
+    }); // Order.insert
 
   } // finally
 
@@ -102,58 +112,54 @@ app.post('/api/payment_methods', async (req, res) => {
 
 // POST /api/create_payment: make a payment
 app.post('/api/create_payment', async (req, res) => {
-  const gatewayRequest = {
-    method: 'POST',
-    // TODO: extract base URL to config constant
-    url: 'https://checkout-test.adyen.com/v53/payments',
-    data: {
-      amount: {
-        // TODO: remove quotes from keys
-        "currency": req.body.amount.currency,
-        "value": req.body.amount.value
-      },
-      "reference":"YOUR_ORDER_NUMBER", //TODO: need to use DB order_id?
-      "paymentMethod": req.body.paymentMethod,
-      "returnUrl": "http://localhost:5000/handleShopperRedirect", //TODO: config const?
-      "merchantAccount":"AdyenRecruitmentCOM",
-      "channel": "Web",
-      "additionalData":{
-        "allow3DS2":true
-       },
-       "browserInfo": req.body.browserInfo
-    },
-    headers: {
-      "X-API-Key": process.env.API_KEY,
-      "Content-type": "application/json"
-    },
-  };
+
+  let createPaymentResponse = {}, orderStatus = '';
 
   try {
 
-    const createPaymentResponse = await api.createPayment( gatewayRequest );
+    createPaymentResponse = await api.createPayment( req.body );
 
     // TODO: remove this conditional if possible
     if (createPaymentResponse.data.action) {
-
       res.cookie("paymentData", createPaymentResponse.data.action.paymentData);
+      orderStatus = 'CREATE_PAYMENT_ACTION_RECEIVED';
       res.json({ action: createPaymentResponse.data.action });
-
     } else {
-
       let resultCode = createPaymentResponse.data.resultCode;
-
+      orderStatus = 'CREATE_PAYMENT_ADYEN_STATUS_RECEIVED';
       const dropinResponse = mapResultCodeToDropinMessage( resultCode );
-
       res.json( dropinResponse );
-    }    //if there is an action
+    }
 
   } catch(e) {
-    res.json( e );
-  }
+
+    orderStatus = 'CREATE_PAYMENT_RECEIVED_FAILURE';
+    createPaymentResponse.data = e.response.data; // for DB update
+    res.json( e.response.data ); // TODO: what to report to frontend here?
+
+  } finally {
+
+
+
+    Order.update(
+      {_id: req.cookies.order_id},
+      { $set: {
+        status: orderStatus,
+        'adyenData.createPayment.request': JSON.parse(createPaymentResponse.config.data),
+        'adyenData.createPayment.response': createPaymentResponse.data,
+        'adyenData.resultCode': createPaymentResponse.data.resultCode
+      }},
+      {multi: false}
+      //   (err, doc) => {
+      // // nothing to do here since responses handled above
+      //   }
+    ); // Order.update
+
+  } // finally
 
 }); // GET /api/create_payment
 
-const mapResultCodeToDropinMessage = function( response ){
+const mapResultCodeToDropinMessage = ( response ) => {
   const map = {
     "Authorised": {
       status: 'success',
@@ -222,7 +228,7 @@ app.all("/handleShopperRedirect", async (req, res) => {
 
   } catch (e) {
     // TODO: log and save to db?
-    res.json( e );
+    res.json( e.response.data );
   }
 
 }); // app.all("/handleShopperRedirect")

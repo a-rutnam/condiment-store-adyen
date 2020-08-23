@@ -1,7 +1,7 @@
 // const api = require('./lib/merchant_api');
 const MERCHANT_API_PAYMENT_METHODS_URL = '/api/payment_methods';
 const MERCHANT_API_CREATE_PAYMENT_URL = '/api/create_payment';
-let fakeUserData = null; //think of better way to do this
+
 
 console.log('hi!', AdyenCheckout);
 
@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const currency = document.querySelector("#currency").value;
 
 
-    fakeUserData = {
+    const fakeUserData = {
       amount: {
         currency: currency,
         value: parseFloat(amount) * 100
@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // TODO: check for error response from Express server,
       // since we're now just forwarding on directly back
       // here any Adyen gateway errors
-      const configuration = createConfig(response.data, CLIENT_KEY);
+      const configuration = createConfig(response.data, CLIENT_KEY, fakeUserData);
       const checkout = new AdyenCheckout(configuration);
       const dropin = checkout.create('dropin').mount('#dropin-container');
 
@@ -60,8 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Convenience function to create config object,
 // passing in the required fields
-const createConfig = (paymentMethods, clientKey) => {
-
+const createConfig = (paymentMethods, clientKey, fakeUserData) => {
   return {
     paymentMethodsResponse: paymentMethods,
     clientKey: clientKey,
@@ -81,6 +80,9 @@ const createConfig = (paymentMethods, clientKey) => {
         if (paymentResponse.data.action) {
           dropin.handleAction(paymentResponse.data.action);
         } else {
+          // TODO: this is duped in redirect backend code, try to refactor
+          document.cookie = 'order_id=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+
           // Report status to UI
           dropin.setStatus(paymentResponse.data.status, paymentResponse.data.message);
         }
