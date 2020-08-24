@@ -2,6 +2,9 @@
 const MERCHANT_API_PAYMENT_METHODS_URL = '/api/payment_methods';
 const MERCHANT_API_CREATE_PAYMENT_URL = '/api/create_payment';
 
+// clearing cookies to clear unwanted state
+document.cookie = 'order_id=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+document.cookie = 'paymentData=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
 
 console.log('hi!', AdyenCheckout);
 
@@ -18,13 +21,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const fakeUserData = {
       amount: {
         currency: currency,
+        // to convert input, human readable amount to minor units. This is brittle and needs to be reconfigured for non-minor unit currencies
         value: parseFloat(amount) * 100
       },
-      // TODO: figure out how this is diferent to browserInfo, how it is really determined
       channel: "Web"
     };
 
-    console.log(fakeUserData);
+
     // TODO: frontend data to send to node. maybe unique order number needed - how should I best set this up for Adyen to flicklog through different options e.g. a bad data request with wrong currency for payment method
 
     // Make request to merchant server which forwards request to Adyen gateway
@@ -88,8 +91,10 @@ const createConfig = (paymentMethods, clientKey, fakeUserData) => {
         }
 
       } catch(err) {
-        // TODO: report error to UI
+        console.log('GATEWAY ERROR');
         console.dir(err);
+        dropin.setStatus('error', { message: 'Something went wrong.'});
+
       }
 
     } //onSubmit handler

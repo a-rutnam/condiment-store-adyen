@@ -14,9 +14,6 @@ var crypto = require("crypto");
 const cookieParser = require("cookie-parser");
 app.use(cookieParser());
 
-
-console.log("/////////////////////////////////////////////////Restart");
-
 app.set('view engine', 'hbs');
 app.engine('hbs', handlebars({
   layoutsDir: __dirname + '/views/layouts',
@@ -27,18 +24,18 @@ app.engine('hbs', handlebars({
   helpers: require("./util/helpers")
 }));
 
-
 app.use(express.static('public'))
 
 // Start the server listening
 app.listen(port, () => console.log(`App listening to port ${port}`));
 
 // PAYMENT PROCESS BEGINS HERE:
-//
+
 // GET /checkout: render main checkout page
 app.get('/checkout', (req, res) => {
   // Pull CLIENT_KEY from .env file and forward to frontend (avoid GitHub publishing)
   res.render('checkout', { CLIENT_KEY: process.env.CLIENT_KEY });
+
 });
 
 // GET /admin: order reporting/logs
@@ -52,26 +49,25 @@ app.get('/admin', (req, res) => {
 
 // API routes /////////////////////////////////////////////////////////////////
 
-
-
 // POST /api/payment_methods: retrieve available payment methods from Adyen
 app.post('/api/payment_methods', async (req, res) => {
 
-
   // For use in DB update in 'finally':
-  let paymentMethodsResponse = {}, orderStatus = '';
+  let paymentMethodsResponse = {}, orderStatus = '',  resultCode = '';
 
   try {
 
     paymentMethodsResponse = await api.getPaymentMethods( req.body.fakeUserData );
-    orderStatus = 'PAYMENT_METHODS_RECEIVED_SUCCESS'; // for DB update
+    // creating a copy of customer's process in merchant's database
+    orderStatus = 'PAYMENT_METHODS_RECEIVED_SUCCESS';
 
   } catch(e) {
 
     orderStatus = 'PAYMENT_METHODS_RECEIVED_FAILURE';
-    // Store error into response for DB in finally
-    paymentMethodsResponse.data = e.response.data;
 
+    // Store error into response for DB in 'finally'
+    paymentMethodsResponse.data = e.response.data;
+    res.json(e.response.data)
   } finally {
 
     const orderDoc = {
@@ -97,48 +93,48 @@ app.post('/api/payment_methods', async (req, res) => {
     };
 
     Order.insert(orderDoc, (err, doc) => {
-
-      // On successful save of Order record, set cookie
+      // On successful save of new Order record, set cookie
       // and forward JSON response to frontend AJAX
       res.cookie("order_id", doc._id); // For future DB updates
       res.json( paymentMethodsResponse.data );
-
     }); // Order.insert
-
   } // finally
-
 }); // app.post('/api/payment_methods')
 
 
 // POST /api/create_payment: make a payment
 app.post('/api/create_payment', async (req, res) => {
 
-  let createPaymentResponse = {}, orderStatus = '';
+  // For use in DB update in 'finally':
+  let createPaymentResponse = {config: {data: null}},
+    orderStatus = '',
+    resultCode = '';
 
   try {
 
     createPaymentResponse = await api.createPayment( req.body );
 
-    // TODO: remove this conditional if possible
+    // TODO: remove this conditional if possible, as it also exists on the front end
     if (createPaymentResponse.data.action) {
-      res.cookie("paymentData", createPaymentResponse.data.action.paymentData);
+      res.cookie("payment_data", createPaymentResponse.data.action.paymentData);
       orderStatus = 'CREATE_PAYMENT_ACTION_RECEIVED';
+      resultCode = createPaymentResponse.data.response
       res.json({ action: createPaymentResponse.data.action });
+
     } else {
-      let resultCode = createPaymentResponse.data.resultCode;
+
+      resultCode = createPaymentResponse.data.resultCode;
       orderStatus = 'CREATE_PAYMENT_ADYEN_STATUS_RECEIVED';
-      const dropinResponse = mapResultCodeToDropinMessage( resultCode );
+      let dropinResponse = mapResultCodeToDropinMessage( resultCode );
       res.json( dropinResponse );
     }
 
   } catch(e) {
-
     orderStatus = 'CREATE_PAYMENT_RECEIVED_FAILURE';
-    createPaymentResponse.data = e.response.data; // for DB update
-    res.json( e.response.data ); // TODO: what to report to frontend here?
+    createPaymentResponse.data = e.response.data; // for DB update - we don't one to send details of failure to client
+    return res.status(422).json({});
 
   } finally {
-
 
 
     Order.update(
@@ -147,16 +143,11 @@ app.post('/api/create_payment', async (req, res) => {
         status: orderStatus,
         'adyenData.createPayment.request': JSON.parse(createPaymentResponse.config.data),
         'adyenData.createPayment.response': createPaymentResponse.data,
-        'adyenData.resultCode': createPaymentResponse.data.resultCode
+        'adyenData.resultCode': resultCode
       }},
       {multi: false}
-      //   (err, doc) => {
-      // // nothing to do here since responses handled above
-      //   }
     ); // Order.update
-
   } // finally
-
 }); // GET /api/create_payment
 
 const mapResultCodeToDropinMessage = ( response ) => {
@@ -203,13 +194,16 @@ const mapResultCodeToDropinMessage = ( response ) => {
 // to redirect browser to, after POLI processing
 app.all("/handleShopperRedirect", async (req, res) => {
 
+
+  let orderID = req.cookies.order_id;
+  let paymentData = req.cookies.payment_data;
   // TODO: rename this
+  // if there is non-POST request
   const reqStuff = (req.method === 'POST') ? req.body : req.query;
 
-  // TODO: object literal
   const payload = {
     details: { payload: reqStuff.payload },
-    paymentData: req.cookies["paymentData"],
+    paymentData: paymentData,
     url: "https://checkout-test.adyen.com/v53/payments/details",
     method: "POST",
     headers: {
@@ -219,23 +213,54 @@ app.all("/handleShopperRedirect", async (req, res) => {
   };
 
   try {
-    let response = await api.createRedirectPayment( payload, reqStuff );
-    // TODO: anything else to clean up here?
-    // ********* Possible action key check & handling?
-    res.clearCookie("paymentData");
-    res.clearCookie("order_id");
-    res.redirect(`/final-status?resultCode=${response.data.resultCode}`);
+    let response = await api.createRedirectPayment( payload );
+
+
+    // if (response.data.action) {
+
+      // Following is not in use: At this point I need to send action data back to the frontend for the dropin to handle but the AdyenCheckout instance requires the full configuration object to be recreated. My question is it better practice to re-pull that data from my database, or from cookies?
+      // res.redirect('/submitAdditionalDetails');
+
+    // } else {
+
+      resultCode = response.data.resultCode;
+      orderStatus = 'CREATE_PAYMENT_ADYEN_STATUS_RECEIVED';
+      const dropinResponse = mapResultCodeToDropinMessage( resultCode );
+
+      Order.update(
+        {_id: orderID},
+        { $set: {
+          'adyenData.createPayment.request': JSON.parse(response.config.data),
+          'adyenData.createPayment.response': response.data,
+          'adyenData.resultCode': resultCode
+        }},
+        {multi: false}
+      ); // Order.update
+
+      res.clearCookie("payment_data");
+      res.clearCookie("order_id");
+      res.json( dropinResponse );
+
+
 
   } catch (e) {
-    // TODO: log and save to db?
-    res.json( e.response.data );
+    res.json( e.code );
+    return;
   }
 
 }); // app.all("/handleShopperRedirect")
 
-
-// GET /final-status: above route directs here after Adyen query
-// TODO: Possibly use res.redirect() switch here as in docs
-app.get("/final-status", (req, res) => {
-  res.render('final-status');
-});
+// not in use
+// app.post("/submitAdditionalDetails", (req, res) => {
+//   // // Create the payload for submitting payment details
+//   // let payload = {};
+//   // payload["details"] = req.body.details;
+//   // payload["paymentData"] = req.body.paymentData;
+//   // // Return the response back to client
+//   // // (for further action handling or presenting result to shopper)
+//   // checkout.paymentsDetails(payload).then(response => {
+//   //   let resultCode = response.resultCode;
+//   //   let action = response.action || null;
+//   //   res.json({ action, resultCode });
+//   // });
+// });
