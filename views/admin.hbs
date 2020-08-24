@@ -17,9 +17,13 @@
       <td>{{ this.user_id }}</td>
       <td>{{ this.status }}</td>
       <td>
-        <pre>
-        {{ json this.adyenData }}
-      </pre>
+        <details>
+          <summary>Response and Request logs</summary>
+          <br>
+          <pre>
+            {{ json this.adyenData }}
+          </pre>
+        </details>
       </td>
     </tr>
     {{/each}}
