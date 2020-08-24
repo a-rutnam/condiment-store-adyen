@@ -52,7 +52,7 @@ app.get('/admin', (req, res) => {
 app.post('/api/payment_methods', async (req, res) => {
 
   // For use in DB update in 'finally':
-  let paymentMethodsResponse = {}, orderStatus = '',  resultCode = '';
+  let paymentMethodsResponse = {config: {data: null}}, orderStatus = '',  resultCode = '';
 
   try {
 
