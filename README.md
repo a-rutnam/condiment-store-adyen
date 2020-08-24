@@ -1,4 +1,4 @@
-# AdyenCheckout project using Node.js + Express 
+# AdyenCheckout project using Node.js + Express
 
 After cloning or download, run `npm run start` to start the express server
 
@@ -7,11 +7,11 @@ There are two main routes
 - http://localhost:5000/admin to view logs of previous transactions
 
 To see a successful payment
-1. Select AUD as currency
+1. Select AUD as currency and click submit - the dropin component will load.
 2. Use sample payment details in either mastercard or Poli
 
 To see an unsuccessful payment
-1. Select NL as currency
+1. Select NL as currency and click submit - the dropin component will load.
 2. Use sample payment details in either mastercard or Poli
 
 

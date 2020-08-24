@@ -27,18 +27,11 @@ document.addEventListener("DOMContentLoaded", () => {
       channel: "Web"
     };
 
-
-    // TODO: frontend data to send to node. maybe unique order number needed - how should I best set this up for Adyen to flicklog through different options e.g. a bad data request with wrong currency for payment method
-
     // Make request to merchant server which forwards request to Adyen gateway
     try {
 
       const response = await axios.post(MERCHANT_API_PAYMENT_METHODS_URL, { fakeUserData });
 
-      // Use response to build checkout UI
-      // TODO: check for error response from Express server,
-      // since we're now just forwarding on directly back
-      // here any Adyen gateway errors
       const configuration = createConfig(response.data, CLIENT_KEY, fakeUserData);
       const checkout = new AdyenCheckout(configuration);
       const dropin = checkout.create('dropin').mount('#dropin-container');

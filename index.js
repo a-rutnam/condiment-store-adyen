@@ -19,7 +19,6 @@ app.engine('hbs', handlebars({
   layoutsDir: __dirname + '/views/layouts',
   extname: 'hbs',
   defaultLayout: 'main',
-  //new configuration parameter
   partialsDir: __dirname + '/views/partials/',
   helpers: require("./util/helpers")
 }));
@@ -165,7 +164,7 @@ const mapResultCodeToDropinMessage = ( response ) => {
       message: "Payment was refused. Please try again using a different payment method or card."
     },
     "Pending": {
-    // not sure about using the eternal spinner here and for received:
+    // not sure about using the eternal spinner here and for received - perhaps need to add in a listener when using.
       status: 'loading',
       message: "We've received your order, and are waiting for the payment to be completed."
     },
@@ -197,7 +196,7 @@ app.all("/handleShopperRedirect", async (req, res) => {
 
   let orderID = req.cookies.order_id;
   let paymentData = req.cookies.payment_data;
-  // TODO: rename this
+
   // if there is non-POST request
   const reqStuff = (req.method === 'POST') ? req.body : req.query;
 
@@ -217,11 +216,11 @@ app.all("/handleShopperRedirect", async (req, res) => {
 
 
     // if (response.data.action) {
-
-      // Following is not in use: At this point I need to send action data back to the frontend for the dropin to handle but the AdyenCheckout instance requires the full configuration object to be recreated. My question is it better practice to re-pull that data from my database, or from cookies?
-      // res.redirect('/submitAdditionalDetails');
-
-    // } else {
+    //
+    //   // Following is not in use: At this point I need to send action data back to the frontend for the dropin to handle but the AdyenCheckout instance requires the full configuration object to be recreated. My question is it better practice to re-pull that data from my database, or from cookies?
+    //   res.redirect('/submitAdditionalDetails');
+    //
+    // } else {}
 
       resultCode = response.data.resultCode;
       orderStatus = 'CREATE_PAYMENT_ADYEN_STATUS_RECEIVED';
@@ -240,7 +239,6 @@ app.all("/handleShopperRedirect", async (req, res) => {
       res.clearCookie("payment_data");
       res.clearCookie("order_id");
       res.json( dropinResponse );
-
 
 
   } catch (e) {
