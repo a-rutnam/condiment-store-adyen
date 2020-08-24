@@ -1,4 +1,6 @@
-# adyen
+# AdyenCheckout project using Node.js + Express 
+
+After cloning or download, run `npm run start` to start the express server
 
 There are two main routes
 - http://localhost:5000/checkout to use the dropin component
