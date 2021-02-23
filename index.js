@@ -45,97 +45,101 @@ app.get('/admin', (req, res) => {
   })
 }); // app.get('/admin')
 
+// .then() and .catch() versus async / await
 
 // API routes /////////////////////////////////////////////////////////////////
 
 // POST /api/payment_methods: retrieve available payment methods from Adyen
-app.post('/api/payment_methods', async (req, res) => {
+app.post('/api/payment_methods', (req, res) => {
 
   // For use in DB update in 'finally':
-  let paymentMethodsResponse = {config: {data: null}}, orderStatus = '',  resultCode = '';
+  let paymentMethodsResponse = {config: {data: null}},
+    orderStatus = '',
+    resultCode = '';
 
-  try {
+  // TODO: replace with .config&. below and in create payments
 
-    paymentMethodsResponse = await api.getPaymentMethods( req.body.fakeUserData );
-    // creating a copy of customer's process in merchant's database
-    orderStatus = 'PAYMENT_METHODS_RECEIVED_SUCCESS';
+  // try {
 
-  } catch(e) {
+    // paymentMethodsResponse = await api.getPaymentMethods( req.body.fakeUserData );
 
-    orderStatus = 'PAYMENT_METHODS_RECEIVED_FAILURE';
+    api.getPaymentMethods(req.body.fakeUserData)
+    .then( res => {
+      paymentMethodsResponse = res;
+      // creating a copy of customer's process in merchant's database
+      orderStatus = 'PAYMENT_METHODS_RECEIVED_SUCCESS';
+    })
+    .catch( e => {
+      orderStatus = 'PAYMENT_METHODS_RECEIVED_FAILURE';
+      // Store error into response for DB in 'finally'
+      paymentMethodsResponse.data = e.response.data;
+      res.json(e.response.data);
+    })
+    .finally( () => {
+      const orderDoc = {
+        status: orderStatus,
+        user_id: 12345, // Fake placeholder
 
-    // Store error into response for DB in 'finally'
-    paymentMethodsResponse.data = e.response.data;
-    res.json(e.response.data)
-  } finally {
+        // Also use the order document to store all the
+        // Adyen request & response data, for auditing/logging
+        adyenData: {
+          paymentMethods: {
+            // Axios gives us original request body in config.data,
+            // but we want to save to DB as an actual JS object,
+            // hence the JSON.parse:
+            request: JSON.parse(paymentMethodsResponse.config.data),
+            response: paymentMethodsResponse.data
+          },
+          createPayment: {
+            request: {},
+            response: {}
+          },
+          resultCode: ''
+        }
+      };
 
-    const orderDoc = {
-      status: orderStatus,
-      user_id: 12345, // Fake placeholder
-
-      // Also use the order document to store all the
-      // Adyen request & response data, for auditing/logging
-      adyenData: {
-        paymentMethods: {
-          // Axios gives us original request body in config.data,
-          // but we want to save to DB as an actual JS object,
-          // hence the JSON.parse:
-          request: JSON.parse(paymentMethodsResponse.config.data),
-          response: paymentMethodsResponse.data
-        },
-        createPayment: {
-          request: {},
-          response: {}
-        },
-        resultCode: ''
-      }
-    };
-
-    Order.insert(orderDoc, (err, doc) => {
-      // On successful save of new Order record, set cookie
-      // and forward JSON response to frontend AJAX
-      res.cookie("order_id", doc._id); // For future DB updates
-      res.json( paymentMethodsResponse.data );
-    }); // Order.insert
-  } // finally
+      Order.insert(orderDoc, (err, doc) => {
+        // On successful save of new Order record, set cookie
+        // and forward JSON response to frontend AJAX
+        res.cookie("order_id", doc._id); // For future DB updates
+        res.json( paymentMethodsResponse.data );
+      }); // Order.insert
+    }); // finally
 }); // app.post('/api/payment_methods')
 
 
 // POST /api/create_payment: make a payment
-app.post('/api/create_payment', async (req, res) => {
+app.post('/api/create_payment', (req, res) => {
 
   // For use in DB update in 'finally':
   let createPaymentResponse = {config: {data: null}},
     orderStatus = '',
     resultCode = '';
 
-  try {
-
-    createPaymentResponse = await api.createPayment( req.body );
-
+  api.createPayment( req.body )
+  .then( result => {
     // TODO: remove this conditional if possible, as it also exists on the front end
+    createPaymentResponse = result;
+
     if (createPaymentResponse.data.action) {
       res.cookie("payment_data", createPaymentResponse.data.action.paymentData);
-      orderStatus = 'CREATE_PAYMENT_ACTION_RECEIVED';
+      orderStatus = 'CREATE_PAYMENT_ACTION_RECEIVED: action';
       resultCode = createPaymentResponse.data.response
       res.json({ action: createPaymentResponse.data.action });
 
     } else {
-
       resultCode = createPaymentResponse.data.resultCode;
-      orderStatus = 'CREATE_PAYMENT_ADYEN_STATUS_RECEIVED';
+      orderStatus = `CREATE_PAYMENT_ADYEN_STATUS_RECEIVED ${resultCode}`;
       let dropinResponse = mapResultCodeToDropinMessage( resultCode );
       res.json( dropinResponse );
     }
-
-  } catch(e) {
+  })
+  .catch(e => {
     orderStatus = 'CREATE_PAYMENT_RECEIVED_FAILURE';
     createPaymentResponse.data = e.response.data; // for DB update - we don't one to send details of failure to client
     return res.status(422).json({});
-
-  } finally {
-
-
+  })
+  .finally( () => {
     Order.update(
       {_id: req.cookies.order_id},
       { $set: {
@@ -146,7 +150,7 @@ app.post('/api/create_payment', async (req, res) => {
       }},
       {multi: false}
     ); // Order.update
-  } // finally
+  });// finally
 }); // GET /api/create_payment
 
 const mapResultCodeToDropinMessage = ( response ) => {
@@ -191,7 +195,7 @@ const mapResultCodeToDropinMessage = ( response ) => {
 
 // (ALL) /handleShopperRedirect: the returnUrl that we give to POLI
 // to redirect browser to, after POLI processing
-app.all("/handleShopperRedirect", async (req, res) => {
+app.post("/handleShopperRedirect", (req, res) => {
 
 
   let orderID = req.cookies.order_id;
@@ -199,11 +203,11 @@ app.all("/handleShopperRedirect", async (req, res) => {
 
   // if there is non-POST request
   const reqStuff = (req.method === 'POST') ? req.body : req.query;
-
+debugger
   const payload = {
-    details: { payload: reqStuff.payload },
+    details: { payload: reqStuff },
     paymentData: paymentData,
-    url: "https://checkout-test.adyen.com/v53/payments/details",
+    url: "https://checkout-test.adyen.com/v64/payments/details",
     method: "POST",
     headers: {
       "X-API-Key": process.env.API_KEY,
@@ -211,26 +215,21 @@ app.all("/handleShopperRedirect", async (req, res) => {
     }
   };
 
-  try {
-    let response = await api.createRedirectPayment( payload );
+  // try {
 
+    // let response = await
+    api.createRedirectPayment( payload )
+    .then( res => {
 
-    // if (response.data.action) {
-    //
-    //   // Following is not in use: At this point I need to send action data back to the frontend for the dropin to handle but the AdyenCheckout instance requires the full configuration object to be recreated. My question is it better practice to re-pull that data from my database, or from cookies?
-    //   res.redirect('/submitAdditionalDetails');
-    //
-    // } else {}
-
-      resultCode = response.data.resultCode;
+      resultCode = res.data.resultCode;
       orderStatus = 'CREATE_PAYMENT_ADYEN_STATUS_RECEIVED';
       const dropinResponse = mapResultCodeToDropinMessage( resultCode );
 
       Order.update(
         {_id: orderID},
         { $set: {
-          'adyenData.createPayment.request': JSON.parse(response.config.data),
-          'adyenData.createPayment.response': response.data,
+          'adyenData.createPayment.request': JSON.parse(res.config.data),
+          'adyenData.createPayment.response': res.data,
           'adyenData.resultCode': resultCode
         }},
         {multi: false}
@@ -239,12 +238,26 @@ app.all("/handleShopperRedirect", async (req, res) => {
       res.clearCookie("payment_data");
       res.clearCookie("order_id");
       res.json( dropinResponse );
+console.log(dropinResponse);
+    }).catch( e => {
+      console.log(e.config);
+    });
+// console.log("xx", response);
+// debugger //we never get here
+    // if (response.data.action) {
+    //
+    //   // Following is not in use: At this point I need to send action data back to the frontend for the dropin to handle but the AdyenCheckout instance requires the full configuration object to be recreated. My question is it better practice to re-pull that data from my database, or from cookies?
+    //   res.redirect('/submitAdditionalDetails');
+    //
+    // } else {}
 
 
-  } catch (e) {
-    res.json( e.code );
-    return;
-  }
+
+  // } catch (e) {
+  //   res.json( e.code );
+  //   debugger
+  //   return;
+  // }
 
 }); // app.all("/handleShopperRedirect")
 

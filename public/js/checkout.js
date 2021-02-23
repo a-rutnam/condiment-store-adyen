@@ -62,6 +62,15 @@ const createConfig = (paymentMethods, clientKey, fakeUserData) => {
     clientKey: clientKey,
     locale: "en-US",
     environment: "test",
+    card: { // Sample Drop-in configuration for 3D Secure
+      hasHolderName: true,
+      holderNameRequired: true,
+      enableStoreDetails: true,
+      name: 'Credit or debit card',
+      billingAddressRequired: true
+    },
+    redirectFromIssuerMethod: 'GET',
+    redirectToIssuerMethod: 'GET',
     onSubmit: async (state, dropin) => {
       try {
 
