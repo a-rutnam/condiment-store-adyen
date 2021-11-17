@@ -1,7 +1,7 @@
 # AdyenCheckout project using Node.js + Express
 
 1. clone or download repo
-2. run `nom install`
+2. run `npm install`
 2. run `npm run start` to start the server
 
 There are two main routes
